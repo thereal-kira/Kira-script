@@ -1,0 +1,196 @@
+-- سكربت خاص بيك - Ultimate Battlegrounds (بدون Key)
+-- ESP + Fly + Speed + Hitbox + Auto Attack
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+
+-- إعدادات
+local Settings = {
+    Speed = 45,
+    FlySpeed = 60,
+    HitboxSize = 15,
+    AutoAttackRange = 20,
+    ESPEnabled = true,
+    SpeedEnabled = true,
+    FlyEnabled = false,
+    HitboxEnabled = true,
+    AutoAttackEnabled = true
+}
+
+-- ===== السرعة =====
+RunService.Heartbeat:Connect(function()
+    if Settings.SpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = Settings.Speed
+    end
+end)
+
+-- ===== الطيران =====
+local BodyVelocity, BodyGyro
+
+local function ToggleFly()
+    Settings.FlyEnabled = not Settings.FlyEnabled
+    local Character = LocalPlayer.Character
+    if not Character then return end
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+    local Humanoid = Character:FindFirstChild("Humanoid")
+    if not Root or not Humanoid then return end
+
+    if Settings.FlyEnabled then
+        Humanoid.PlatformStand = true
+        BodyVelocity = Instance.new("BodyVelocity")
+        BodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        BodyVelocity.Velocity = Vector3.zero
+        BodyVelocity.Parent = Root
+
+        BodyGyro = Instance.new("BodyGyro")
+        BodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        BodyGyro.Parent = Root
+    else
+        Humanoid.PlatformStand = false
+        if BodyVelocity then BodyVelocity:Destroy() end
+        if BodyGyro then BodyGyro:Destroy() end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not Settings.FlyEnabled then return end
+    local Character = LocalPlayer.Character
+    if not Character then return end
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+    if not Root or not BodyVelocity or not BodyGyro then return end
+
+    local move = Vector3.zero
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + Camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - Camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - Camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + Camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
+    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
+
+    if move.Magnitude > 0 then
+        BodyVelocity.Velocity = move.Unit * Settings.FlySpeed
+    else
+        BodyVelocity.Velocity = Vector3.zero
+    end
+    BodyGyro.CFrame = Camera.CFrame
+end)
+
+-- زر F للطيران
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        ToggleFly()
+    end
+end)
+
+-- ===== Hitbox =====
+RunService.Heartbeat:Connect(function()
+    if not Settings.HitboxEnabled then return end
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local root = player.Character.HumanoidRootPart
+            root.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+            root.Transparency = 0.7
+            root.CanCollide = false
+        end
+    end
+end)
+
+-- ===== ESP =====
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+    local Character = player.Character
+    if not Character then return end
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+    local Humanoid = Character:FindFirstChild("Humanoid")
+    if not Root or not Humanoid then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESPHighlight"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.5
+    highlight.Parent = Character
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESPName"
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = Root
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.Text = player.Name
+    text.TextColor3 = Color3.new(1, 1, 1)
+    text.TextStrokeTransparency = 0
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 14
+    text.Parent = billboard
+end
+
+local function RemoveESP(player)
+    if player.Character then
+        local highlight = player.Character:FindFirstChild("ESPHighlight")
+        if highlight then highlight:Destroy() end
+        local root = player.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            local billboard = root:FindFirstChild("ESPName")
+            if billboard then billboard:Destroy() end
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        if Settings.ESPEnabled then
+            CreateESP(player)
+        end
+    end)
+end)
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player.Character then
+        CreateESP(player)
+    end
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        if Settings.ESPEnabled then
+            CreateESP(player)
+        end
+    end)
+end
+
+-- ===== Auto Attack =====
+RunService.Heartbeat:Connect(function()
+    if not Settings.AutoAttackEnabled then return end
+    local Character = LocalPlayer.Character
+    if not Character then return end
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+    if not Root then return end
+
+    local closest, closestDist = nil, Settings.AutoAttackRange
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local dist = (Root.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if dist < closestDist then
+                closest = player
+                closestDist = dist
+            end
+        end
+    end
+
+    if closest then
+        -- محاولة الضغط على الهجوم (Left Click)
+        mouse1click()
+    end
+end)
+
+print("✅ السكربت الخاص ديالك تحمّل بنجاح!")
+print("اضغط F باش تشعل/تطفي الطيران")
